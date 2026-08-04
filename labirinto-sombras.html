@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Labirinto das Sombras</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; user-select:none; }
+  html, body {
+    height:100%;
+    background: #05070a;
+    overflow:hidden;
+    touch-action: none;
+  }
+  body {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #wrap {
+    width:100%;
+    max-width:440px;
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+  h1 {
+    color:#ffd7db;
+    font-size:14px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    font-weight:600;
+    opacity:0.85;
+  }
+  #stage {
+    position:relative;
+    width:100%;
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow: 0 0 0 1px rgba(248,113,113,0.18), 0 20px 60px -20px rgba(0,0,0,0.85);
+  }
+  canvas {
+    display:block;
+    width:100%;
+    height:auto;
+    background:#05070a;
+  }
+  #hud {
+    position:absolute;
+    top:10px;
+    left:0; right:0;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:0 14px;
+    pointer-events:none;
+  }
+  #alertWrap {
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  #alertLabel {
+    font-family:'Courier New', monospace;
+    font-size:10px;
+    letter-spacing:0.08em;
+    color:#ffb4b9;
+    text-shadow:0 0 6px rgba(248,113,113,0.5);
+  }
+  #alertTrack {
+    flex:1;
+    height:6px;
+    border-radius:4px;
+    background:rgba(255,255,255,0.1);
+    overflow:hidden;
+  }
+  #alertFill {
+    height:100%;
+    width:0%;
+    background:#f87171;
+    box-shadow:0 0 8px rgba(248,113,113,0.7);
+    transition: width 0.08s linear;
+  }
+  #keyIcon {
+    width:14px; height:14px;
+    position:relative;
+  }
+  #keyIcon .head {
+    width:8px; height:8px; border-radius:50%;
+    border:2px solid rgba(255,255,255,0.28);
+    position:absolute; left:0; top:0;
+  }
+  #keyIcon .shaft {
+    position:absolute; left:7px; top:5px;
+    width:7px; height:2px;
+    background:rgba(255,255,255,0.28);
+  }
+  #keyIcon.collected .head { border-color:#ffd76a; box-shadow:0 0 6px rgba(255,215,106,0.8); }
+  #keyIcon.collected .shaft { background:#ffd76a; box-shadow:0 0 6px rgba(255,215,106,0.8); }
+
+  #overlay {
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:rgba(5,7,10,0.55);
+    color:#fff0f1;
+    text-align:center;
+    padding:24px;
+  }
+  #overlay .big { font-size:18px; font-weight:700; letter-spacing:0.03em; }
+  #overlay .small { font-size:12px; opacity:0.75; font-family:'Courier New', monospace; max-width:260px; }
+
+  #joystick {
+    position:absolute;
+    left:18px; bottom:18px;
+    width:78px; height:78px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.05);
+    border:1.5px solid rgba(255,255,255,0.16);
+  }
+  #stick {
+    position:absolute;
+    left:24px; top:24px;
+    width:30px; height:30px;
+    border-radius:50%;
+    background:rgba(248,113,113,0.3);
+    border:1.5px solid rgba(248,113,113,0.65);
+  }
+  #hint { color:#4c525c; font-size:12px; letter-spacing:0.04em; text-align:center; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Labirinto das Sombras</h1>
+  <div id="stage">
+    <canvas id="game" width="390" height="286"></canvas>
+    <div id="hud">
+      <div id="alertWrap">
+        <span id="alertLabel">ALERTA</span>
+        <div id="alertTrack"><div id="alertFill"></div></div>
+      </div>
+      <div id="keyIcon"><div class="head"></div><div class="shaft"></div></div>
+    </div>
+    <div id="joystick"><div id="stick"></div></div>
+    <div id="overlay">
+      <div class="big">Labirinto das Sombras</div>
+      <div class="small">arraste para andar · fique fora da luz dos guardas · pegue a chave e escape</div>
+    </div>
+  </div>
+  <div id="hint">arraste no manche para mover · setas/WASD no computador</div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const TILE = 26;
+  const COLS = 15, ROWS = 11;
+  const W = canvas.width, H = canvas.height;
+
+  const alertFill = document.getElementById('alertFill');
+  const keyIcon = document.getElementById('keyIcon');
+  const overlay = document.getElementById('overlay');
+  const joystick = document.getElementById('joystick');
+  const stick = document.getElementById('stick');
+
+  const MAZE = [
+    "###############",
+    "#..#.....#....#",
+    "#..#.....#....#",
+    "#..#..#..#..#.#",
+    "#..#..#.....#.#",
+    "#..#.....#..#.#",
+    "#..#..#..#..#.#",
+    "#..#..#..#..#.#",
+    "#.....#.....#.#",
+    "#.....#.....#.#",
+    "###############"
+  ];
+
+  function isWall(col,row){
+    if (row<0||row>=ROWS||col<0||col>=COLS) return true;
+    return MAZE[row][col] === '#';
+  }
+  function tileCenter(col,row){ return {x: col*TILE+TILE/2, y: row*TILE+TILE/2}; }
+
+  let gameState = 'start'; // start | playing | caught | win
+  let frame = 0;
+  let alert = 0;
+  let hasKey = false;
+  let shake = 0, flash = 0;
+
+  const startPos = tileCenter(1,1);
+  const keyPos = tileCenter(5,5);
+  const exitPos = tileCenter(13,1);
+
+  const player = { x:startPos.x, y:startPos.y, r:8, speed:1.7 };
+
+  function mkGuard(col,rowA,rowB){
+    const a = tileCenter(col,rowA), b = tileCenter(col,rowB);
+    return { x:a.x, y:a.y, wa:a, wb:b, target:b, speed:1.0, facing:{x:0,y:1}, range:130, halfCone:0.5 };
+  }
+  const guards = [ mkGuard(1,2,8), mkGuard(7,2,8), mkGuard(10,2,8) ];
+
+  const torches = [
+    {col:2,row:1},{col:8,row:2},{col:11,row:8},{col:5,row:8},{col:13,row:5}
+  ];
+
+  let particles = [];
+
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+  function dist(ax,ay,bx,by){ return Math.hypot(ax-bx,ay-by); }
+  function normAngle(a){ while(a>Math.PI)a-=Math.PI*2; while(a<-Math.PI)a+=Math.PI*2; return a; }
+
+  // ---------- input ----------
+  const keys = new Set();
+  document.addEventListener('keydown', e=>{
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code) || ['w','a','s','d'].includes(e.key.toLowerCase())) e.preventDefault();
+    keys.add(e.code);
+  });
+  document.addEventListener('keyup', e=> keys.delete(e.code));
+  function keyVector(){
+    let dx=0,dy=0;
+    if (keys.has('ArrowLeft')||keys.has('KeyA')) dx-=1;
+    if (keys.has('ArrowRight')||keys.has('KeyD')) dx+=1;
+    if (keys.has('ArrowUp')||keys.has('KeyW')) dy-=1;
+    if (keys.has('ArrowDown')||keys.has('KeyS')) dy+=1;
+    return {dx,dy};
+  }
+
+  let joyActive=false, joyId=null, joyVec={x:0,y:0};
+  const joyRect = ()=> joystick.getBoundingClientRect();
+  function joyStart(id,cx,cy){ joyActive=true; joyId=id; joyMove(cx,cy); }
+  function joyMove(cx,cy){
+    if (!joyActive) return;
+    const r = joyRect();
+    const ccx=r.left+r.width/2, ccy=r.top+r.height/2;
+    let dx=cx-ccx, dy=cy-ccy;
+    const maxR=r.width/2;
+    const d=Math.hypot(dx,dy);
+    if (d>maxR){ dx=dx/d*maxR; dy=dy/d*maxR; }
+    joyVec={x:dx/maxR,y:dy/maxR};
+    stick.style.transform=`translate(${dx}px,${dy}px)`;
+  }
+  function joyEnd(){ joyActive=false; joyId=null; joyVec={x:0,y:0}; stick.style.transform='translate(0,0)'; }
+  joystick.addEventListener('touchstart', e=>{ e.preventDefault(); const t=e.changedTouches[0]; joyStart(t.identifier,t.clientX,t.clientY); }, {passive:false});
+  joystick.addEventListener('touchmove', e=>{ e.preventDefault(); for (const t of e.changedTouches){ if (t.identifier===joyId) joyMove(t.clientX,t.clientY); } }, {passive:false});
+  joystick.addEventListener('touchend', e=>{ e.preventDefault(); for (const t of e.changedTouches){ if (t.identifier===joyId) joyEnd(); } }, {passive:false});
+  joystick.addEventListener('mousedown', e=> joyStart('mouse',e.clientX,e.clientY));
+  window.addEventListener('mousemove', e=>{ if (joyId==='mouse') joyMove(e.clientX,e.clientY); });
+  window.addEventListener('mouseup', ()=>{ if (joyId==='mouse') joyEnd(); });
+
+  overlay.addEventListener('touchstart', e=>{ e.preventDefault(); tapStart(); }, {passive:false});
+  overlay.addEventListener('mousedown', tapStart);
+  function tapStart(){
+    if (gameState==='start'){ gameState='playing'; overlay.style.display='none'; }
+    else if (gameState==='caught' || gameState==='win'){ resetGame(); gameState='playing'; overlay.style.display='none'; }
+  }
+
+  function resetGame(){
+    player.x=startPos.x; player.y=startPos.y;
+    alert = 0; hasKey = false; particles=[];
+    keyIcon.classList.remove('collected');
+    alertFill.style.width='0%';
+    guards.forEach((g,i)=>{
+      const a = g.wa;
+      g.x=a.x; g.y=a.y; g.target=g.wb;
+    });
+  }
+
+  function triggerCaught(){
+    gameState='caught'; shake=14; flash=1;
+    overlay.querySelector('.big').textContent = 'Você foi flagrado!';
+    overlay.querySelector('.small').textContent = 'os guardas te encontraram · toque para tentar de novo';
+    overlay.style.display='flex';
+  }
+  function triggerWin(){
+    gameState='win';
+    overlay.querySelector('.big').textContent = 'Você escapou!';
+    overlay.querySelector('.small').textContent = 'a chave abriu o caminho para fora do labirinto · toque para jogar de novo';
+    overlay.style.display='flex';
+  }
+
+  // ---------- collision ----------
+  function resolveWalls(entity){
+    const col = Math.floor(entity.x/TILE), row = Math.floor(entity.y/TILE);
+    for (let r=row-1; r<=row+1; r++){
+      for (let c=col-1; c<=col+1; c++){
+        if (!isWall(c,r)) continue;
+        const rx = c*TILE, ry = r*TILE;
+        const cx = clamp(entity.x, rx, rx+TILE);
+        const cy = clamp(entity.y, ry, ry+TILE);
+        const dx = entity.x-cx, dy = entity.y-cy;
+        const d = Math.hypot(dx,dy);
+        if (d < entity.r && d>0.0001){
+          const push = entity.r-d;
+          entity.x += dx/d*push;
+          entity.y += dy/d*push;
+        } else if (d<=0.0001){
+          entity.x += entity.r; // fallback nudge
+        }
+      }
+    }
+  }
+
+  function hasLineOfSight(x0,y0,x1,y1){
+    const steps = 14;
+    for (let i=1;i<steps;i++){
+      const t = i/steps;
+      const x = x0+(x1-x0)*t, y = y0+(y1-y0)*t;
+      if (isWall(Math.floor(x/TILE), Math.floor(y/TILE))) return false;
+    }
+    return true;
+  }
+
+  function canSeePlayer(g){
+    const dx = player.x-g.x, dy = player.y-g.y;
+    const d = Math.hypot(dx,dy);
+    if (d > g.range) return false;
+    const angTo = Math.atan2(dy,dx);
+    const angFacing = Math.atan2(g.facing.y,g.facing.x);
+    if (Math.abs(normAngle(angTo-angFacing)) > g.halfCone) return false;
+    return hasLineOfSight(g.x,g.y,player.x,player.y);
+  }
+
+  // ---------- update ----------
+  function update(){
+    frame++;
+    const kv = keyVector();
+    let ix = joyActive ? joyVec.x : kv.dx;
+    let iy = joyActive ? joyVec.y : kv.dy;
+    const mag = Math.hypot(ix,iy);
+    if (mag>0.05){
+      const nx = ix/Math.max(mag,1), ny = iy/Math.max(mag,1);
+      const scale = joyActive ? clamp(mag,0,1) : 1;
+      player.x += nx*player.speed*scale;
+      player.y += ny*player.speed*scale;
+    }
+    player.x = clamp(player.x, player.r, W-player.r);
+    player.y = clamp(player.y, player.r, H-player.r);
+    resolveWalls(player);
+
+    guards.forEach(g=>{
+      const dx = g.target.x-g.x, dy = g.target.y-g.y;
+      const d = Math.hypot(dx,dy);
+      if (d < 2){
+        g.target = (g.target===g.wa) ? g.wb : g.wa;
+      } else {
+        g.facing = {x:dx/d, y:dy/d};
+        g.x += dx/d*g.speed;
+        g.y += dy/d*g.speed;
+      }
+    });
+
+    let seen = false;
+    guards.forEach(g=>{ if (canSeePlayer(g)) seen = true; });
+    if (seen){
+      alert = clamp(alert + 1.7, 0, 100);
+    } else {
+      alert = clamp(alert - 1.0, 0, 100);
+    }
+    alertFill.style.width = alert + '%';
+    alertFill.style.background = alert>65 ? '#ff3b3b' : (alert>30 ? '#f87171' : '#f59e9e');
+    if (alert>=100) triggerCaught();
+
+    if (!hasKey && dist(player.x,player.y,keyPos.x,keyPos.y) < player.r+9){
+      hasKey = true;
+      keyIcon.classList.add('collected');
+      for (let i=0;i<10;i++){
+        const a=Math.random()*Math.PI*2, sp=0.8+Math.random()*1.6;
+        particles.push({x:keyPos.x,y:keyPos.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:22,color:'255,215,106'});
+      }
+    }
+    if (hasKey && dist(player.x,player.y,exitPos.x,exitPos.y) < player.r+10){
+      triggerWin();
+    }
+
+    particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.04; p.life--; });
+    particles = particles.filter(p=>p.life>0);
+
+    if (shake>0) shake-=0.6;
+    if (flash>0) flash-=0.05;
+  }
+
+  // ---------- render ----------
+  function drawMaze(){
+    ctx.fillStyle = '#0c1116';
+    ctx.fillRect(0,0,W,H);
+    for (let r=0;r<ROWS;r++){
+      for (let c=0;c<COLS;c++){
+        const x=c*TILE, y=r*TILE;
+        if (isWall(c,r)){
+          ctx.fillStyle = '#171d24';
+          ctx.fillRect(x,y,TILE,TILE);
+          ctx.strokeStyle = 'rgba(94,150,180,0.08)';
+          ctx.strokeRect(x+0.5,y+0.5,TILE-1,TILE-1);
+        } else {
+          ctx.fillStyle = ((r+c)%2===0) ? '#0f151b' : '#111820';
+          ctx.fillRect(x,y,TILE,TILE);
+        }
+      }
+    }
+    torches.forEach(t=>{
+      const p = tileCenter(t.col,t.row);
+      const flick = 5+Math.sin(frame*0.2+t.col)*1.5;
+      const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,18+flick);
+      g.addColorStop(0,'rgba(255,180,84,0.35)');
+      g.addColorStop(1,'rgba(255,180,84,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.x,p.y,18+flick,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffb454';
+      ctx.beginPath(); ctx.arc(p.x,p.y,2.4,0,Math.PI*2); ctx.fill();
+    });
+  }
+
+  function drawKeyAndExit(){
+    if (!hasKey){
+      const p = 3+Math.sin(frame*0.1)*1.3;
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,215,106,0.9)';
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = '#ffd76a';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(keyPos.x-3,keyPos.y,4+p*0.2,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(keyPos.x+1,keyPos.y); ctx.lineTo(keyPos.x+8,keyPos.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(keyPos.x+8,keyPos.y); ctx.lineTo(keyPos.x+8,keyPos.y+3); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.save();
+    const glow = hasKey ? 'rgba(94,234,212,0.9)' : 'rgba(120,120,130,0.4)';
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = hasKey ? '#5eead4' : 'rgba(150,150,160,0.5)';
+    ctx.lineWidth = 2.4;
+    ctx.strokeRect(exitPos.x-9,exitPos.y-11,18,22);
+    ctx.restore();
+  }
+
+  function drawGuard(g){
+    ctx.save();
+    const ang = Math.atan2(g.facing.y,g.facing.x);
+    ctx.translate(g.x,g.y);
+    ctx.rotate(ang);
+    const grad = ctx.createRadialGradient(0,0,2,g.range*0.15,0,g.range);
+    grad.addColorStop(0,'rgba(255,214,140,0.28)');
+    grad.addColorStop(1,'rgba(255,214,140,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,g.range,-g.halfCone,g.halfCone);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(248,113,113,0.6)';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#1a1015';
+    ctx.beginPath(); ctx.arc(g.x,g.y,8,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(248,113,113,0.6)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.fillStyle = '#ffb454';
+    ctx.beginPath(); ctx.arc(g.x+g.facing.x*4, g.y+g.facing.y*4, 1.6, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPlayer(){
+    ctx.save();
+    ctx.shadowColor = 'rgba(94,234,212,0.6)';
+    ctx.shadowBlur = 7;
+    ctx.fillStyle = '#0e1a17';
+    ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#5eead4';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawFog(){
+    const grad = ctx.createRadialGradient(player.x,player.y,30,player.x,player.y,150);
+    grad.addColorStop(0,'rgba(0,0,0,0)');
+    grad.addColorStop(1,'rgba(0,0,0,0.86)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  function render(){
+    ctx.save();
+    if (shake>0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+    ctx.clearRect(-20,-20,W+40,H+40);
+    drawMaze();
+    drawKeyAndExit();
+    guards.forEach(drawGuard);
+    drawPlayer();
+
+    particles.forEach(p=>{
+      ctx.fillStyle = `rgba(${p.color},${Math.max(0,p.life/22)})`;
+      ctx.beginPath(); ctx.arc(p.x,p.y,2,0,Math.PI*2); ctx.fill();
+    });
+
+    drawFog();
+
+    if (flash>0){
+      ctx.fillStyle = `rgba(255,60,60,${flash*0.35})`;
+      ctx.fillRect(0,0,W,H);
+    }
+    ctx.restore();
+  }
+
+  function loop(){
+    if (gameState==='playing') update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  render();
+  loop();
+})();
+</script>
+</body>
+</html>
