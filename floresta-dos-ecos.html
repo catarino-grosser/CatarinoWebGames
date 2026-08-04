@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Floresta dos Ecos</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; user-select:none; }
+  html, body {
+    height:100%;
+    background: #030a08;
+    overflow:hidden;
+    touch-action: none;
+  }
+  body {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #wrap {
+    width:100%;
+    max-width:460px;
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+  h1 {
+    color:#c9f7dd;
+    font-size:14px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    font-weight:600;
+    opacity:0.85;
+  }
+  #stage {
+    position:relative;
+    width:100%;
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow: 0 0 0 1px rgba(74,222,128,0.18), 0 20px 60px -20px rgba(0,0,0,0.85);
+  }
+  canvas {
+    display:block;
+    width:100%;
+    height:auto;
+    background:#030a08;
+  }
+  #hud {
+    position:absolute;
+    top:10px;
+    left:0; right:0;
+    display:flex;
+    justify-content:space-between;
+    padding:0 14px;
+    pointer-events:none;
+  }
+  #hp { display:flex; gap:5px; align-items:center; }
+  .heart {
+    width:11px; height:11px; border-radius:50% 50% 50% 0;
+    transform:rotate(45deg);
+    background:#ff6b81;
+    box-shadow:0 0 6px rgba(255,107,129,0.8);
+  }
+  .heart.lost { background:transparent; border:1.5px solid rgba(255,255,255,0.22); box-shadow:none; }
+  #embers {
+    font-family:'Courier New', monospace;
+    font-weight:700;
+    font-size:13px;
+    color:#d7ffe8;
+    text-shadow:0 0 8px rgba(74,222,128,0.55);
+  }
+  #dialogue {
+    position:absolute;
+    left:10px; right:10px; bottom:10px;
+    background:rgba(4,12,9,0.92);
+    border:1px solid rgba(74,222,128,0.35);
+    border-radius:12px;
+    padding:12px 14px;
+    display:none;
+    color:#eafff2;
+    font-size:12.5px;
+    line-height:1.5;
+  }
+  #dialogue .name {
+    font-family:'Courier New', monospace;
+    font-size:10.5px;
+    letter-spacing:0.06em;
+    color:#4ade80;
+    text-transform:uppercase;
+    margin-bottom:4px;
+  }
+  #dialogue .next {
+    text-align:right;
+    font-size:10.5px;
+    color:#7b8f82;
+    margin-top:6px;
+  }
+  #joystick {
+    position:absolute;
+    left:18px; bottom:18px;
+    width:78px; height:78px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.05);
+    border:1.5px solid rgba(255,255,255,0.16);
+  }
+  #stick {
+    position:absolute;
+    left:24px; top:24px;
+    width:30px; height:30px;
+    border-radius:50%;
+    background:rgba(74,222,128,0.35);
+    border:1.5px solid rgba(74,222,128,0.7);
+    transition: transform 0.05s linear;
+  }
+  #actionBtn {
+    position:absolute;
+    right:20px; bottom:22px;
+    width:60px; height:60px;
+    border-radius:50%;
+    background:rgba(74,222,128,0.14);
+    border:1.5px solid rgba(74,222,128,0.55);
+    color:#d7ffe8;
+    font-size:22px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  #overlay {
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:rgba(3,10,8,0.55);
+    color:#eafff2;
+    text-align:center;
+    padding:24px;
+  }
+  #overlay .big { font-size:18px; font-weight:700; letter-spacing:0.03em; }
+  #overlay .small { font-size:12px; opacity:0.75; font-family:'Courier New', monospace; max-width:260px; }
+  #hint { color:#4d6156; font-size:12px; letter-spacing:0.04em; text-align:center; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Floresta dos Ecos</h1>
+  <div id="stage">
+    <canvas id="game" width="420" height="300"></canvas>
+    <div id="hud">
+      <div id="hp">
+        <div class="heart"></div><div class="heart"></div><div class="heart"></div>
+      </div>
+      <div id="embers">BRASAS 0/3</div>
+    </div>
+    <div id="dialogue">
+      <div class="name">Lumen</div>
+      <div class="text"></div>
+      <div class="next">toque para continuar ▸</div>
+    </div>
+    <div id="joystick"><div id="stick"></div></div>
+    <div id="actionBtn">⚔</div>
+    <div id="overlay">
+      <div class="big">Floresta dos Ecos</div>
+      <div class="small">arraste no canto esquerdo para andar · toque na espada para atacar ou falar com o espírito</div>
+    </div>
+  </div>
+  <div id="hint">movimento no manche · ⚔ ataca ou interage · WASD + espaço no computador</div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const margin = 16;
+
+  const hpEl = document.getElementById('hp');
+  const hearts = document.querySelectorAll('.heart');
+  const embersEl = document.getElementById('embers');
+  const dialogueEl = document.getElementById('dialogue');
+  const dialogueText = dialogueEl.querySelector('.text');
+  const overlay = document.getElementById('overlay');
+  const joystick = document.getElementById('joystick');
+  const stick = document.getElementById('stick');
+  const actionBtn = document.getElementById('actionBtn');
+
+  let gameState = 'start'; // start | playing | win | defeat
+  let dialogueActive = false;
+  let dialogueQueue = [];
+  let dialogueOnDone = null;
+  let questState = 'before'; // before | active | done
+  let embersCollected = 0;
+  let frame = 0;
+  let shake = 0, flash = 0;
+
+  const player = {
+    x: 70, y: 250, r: 10, speed: 2.05,
+    vx:0, vy:0, kx:0, ky:0,
+    facing:'up', hp: 3, invuln: 0,
+    attackCd: 0
+  };
+  let attackHitbox = null;
+
+  const npc = { x: 68, y: 176, r: 13, interactR: 44 };
+
+  const trees = [
+    {x:150,y:56,r:20},{x:230,y:104,r:18},{x:118,y:150,r:16},
+    {x:300,y:150,r:20},{x:180,y:222,r:18},{x:262,y:246,r:16},
+    {x:344,y:96,r:14},{x:92,y:96,r:13},{x:300,y:60,r:14}
+  ];
+  const rocks = [
+    {x:200,y:186,r:11},{x:110,y:214,r:9},{x:250,y:190,r:10}
+  ];
+
+  function mkEnemy(x,y){
+    return {x,y,r:11,hp:3,maxHp:3,state:'wander',
+      dir:Math.random()*Math.PI*2, wanderT:0,
+      kx:0,ky:0, invuln:0, alive:true, bob:Math.random()*Math.PI*2};
+  }
+  let enemies = [ mkEnemy(350,60), mkEnemy(360,236), mkEnemy(150,268) ];
+  let embers = [];
+  let particles = [];
+  const fireflies = [];
+  for (let i=0;i<22;i++){
+    fireflies.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.3+0.6,tw:Math.random()*Math.PI*2,spd:0.1+Math.random()*0.2});
+  }
+
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+  function dist(ax,ay,bx,by){ return Math.hypot(ax-bx,ay-by); }
+
+  // ---------- input ----------
+  const keys = new Set();
+  document.addEventListener('keydown', e=>{
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Space'].includes(e.code)||['w','a','s','d','e'].includes(e.key.toLowerCase())){
+      e.preventDefault();
+    }
+    keys.add(e.code);
+    if (e.code==='Space' || e.code==='KeyE'){
+      if (dialogueActive) advanceDialogue();
+      else if (gameState==='playing') doAction();
+      else if (gameState!=='playing') tapStart();
+    }
+  });
+  document.addEventListener('keyup', e=> keys.delete(e.code));
+
+  function keyVector(){
+    let dx=0, dy=0;
+    if (keys.has('ArrowLeft')||keys.has('KeyA')) dx-=1;
+    if (keys.has('ArrowRight')||keys.has('KeyD')) dx+=1;
+    if (keys.has('ArrowUp')||keys.has('KeyW')) dy-=1;
+    if (keys.has('ArrowDown')||keys.has('KeyS')) dy+=1;
+    return {dx,dy};
+  }
+
+  let joyActive=false, joyId=null, joyVec={x:0,y:0};
+  const joyRect = ()=> joystick.getBoundingClientRect();
+  function joyStart(id,clientX,clientY){
+    joyActive=true; joyId=id; joyMove(clientX,clientY);
+  }
+  function joyMove(clientX,clientY){
+    if (!joyActive) return;
+    const r = joyRect();
+    const cx = r.left+r.width/2, cy = r.top+r.height/2;
+    let dx = clientX-cx, dy = clientY-cy;
+    const maxR = r.width/2;
+    const d = Math.hypot(dx,dy);
+    if (d>maxR){ dx = dx/d*maxR; dy = dy/d*maxR; }
+    joyVec = {x:dx/maxR, y:dy/maxR};
+    stick.style.transform = `translate(${dx}px,${dy}px)`;
+  }
+  function joyEnd(){ joyActive=false; joyId=null; joyVec={x:0,y:0}; stick.style.transform='translate(0,0)'; }
+
+  joystick.addEventListener('touchstart', e=>{ e.preventDefault(); const t=e.changedTouches[0]; joyStart(t.identifier,t.clientX,t.clientY); }, {passive:false});
+  joystick.addEventListener('touchmove', e=>{ e.preventDefault(); for (const t of e.changedTouches){ if (t.identifier===joyId) joyMove(t.clientX,t.clientY); } }, {passive:false});
+  joystick.addEventListener('touchend', e=>{ e.preventDefault(); for (const t of e.changedTouches){ if (t.identifier===joyId) joyEnd(); } }, {passive:false});
+  joystick.addEventListener('mousedown', e=> joyStart('mouse',e.clientX,e.clientY));
+  window.addEventListener('mousemove', e=>{ if (joyId==='mouse') joyMove(e.clientX,e.clientY); });
+  window.addEventListener('mouseup', e=>{ if (joyId==='mouse') joyEnd(); });
+
+  function pressAction(){
+    if (dialogueActive){ advanceDialogue(); return; }
+    if (gameState!=='playing'){ tapStart(); return; }
+    doAction();
+  }
+  actionBtn.addEventListener('touchstart', e=>{ e.preventDefault(); pressAction(); }, {passive:false});
+  actionBtn.addEventListener('mousedown', e=>{ e.preventDefault(); pressAction(); });
+
+  overlay.addEventListener('touchstart', e=>{ e.preventDefault(); tapStart(); }, {passive:false});
+  overlay.addEventListener('mousedown', tapStart);
+  dialogueEl.addEventListener('touchstart', e=>{ e.preventDefault(); advanceDialogue(); }, {passive:false});
+  dialogueEl.addEventListener('mousedown', advanceDialogue);
+
+  function tapStart(){
+    if (gameState==='start'){ gameState='playing'; overlay.style.display='none'; }
+    else if (gameState==='win' || gameState==='defeat'){ resetGame(); gameState='playing'; overlay.style.display='none'; }
+  }
+
+  // ---------- dialogue ----------
+  function startDialogue(lines, onDone){
+    dialogueQueue = lines.slice();
+    dialogueOnDone = onDone;
+    dialogueActive = true;
+    dialogueEl.style.display = 'block';
+    showNextLine();
+  }
+  function showNextLine(){
+    if (dialogueQueue.length===0){
+      dialogueActive = false;
+      dialogueEl.style.display = 'none';
+      if (dialogueOnDone) dialogueOnDone();
+      return;
+    }
+    dialogueText.textContent = dialogueQueue.shift();
+  }
+  function advanceDialogue(){
+    if (!dialogueActive) return;
+    showNextLine();
+  }
+
+  const introLines = [
+    'Viajante... finalmente alguém chegou.',
+    'As sombras roubaram as três brasas que mantêm esta floresta viva.',
+    'Derrote os espectros sombrios e traga as brasas de volta para mim.'
+  ];
+  const reminderLines = ['Ainda sinto brasas por perto... continue procurando, viajante.'];
+  const completeLines = [
+    'Você conseguiu! A floresta pode respirar de novo.',
+    'Obrigada, viajante. Que sua luz nunca se apague.'
+  ];
+  const doneLines = ['Vá em paz, viajante.'];
+
+  function tryInteract(){
+    if (dist(player.x,player.y,npc.x,npc.y) < npc.interactR + player.r){
+      if (questState==='before'){
+        startDialogue(introLines, ()=>{ questState='active'; });
+      } else if (questState==='active'){
+        if (embersCollected>=3){
+          startDialogue(completeLines, ()=>{ questState='done'; triggerWin(); });
+        } else {
+          startDialogue(reminderLines, null);
+        }
+      } else {
+        startDialogue(doneLines, null);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function doAction(){
+    if (tryInteract()) return;
+    if (player.attackCd>0) return;
+    player.attackCd = 22;
+    const fv = facingVector(player.facing);
+    attackHitbox = {
+      x: player.x+fv.x*(player.r+14), y: player.y+fv.y*(player.r+14),
+      r:16, life:10, hitSet:new Set()
+    };
+  }
+
+  function facingVector(f){
+    if (f==='up') return {x:0,y:-1};
+    if (f==='down') return {x:0,y:1};
+    if (f==='left') return {x:-1,y:0};
+    return {x:1,y:0};
+  }
+
+  // ---------- game flow ----------
+  function updateHearts(){
+    hearts.forEach((h,i)=> h.classList.toggle('lost', i>=player.hp));
+  }
+  function resetGame(){
+    player.x=70; player.y=250; player.hp=3; player.invuln=0; player.attackCd=0; player.facing='up';
+    questState='before'; embersCollected=0;
+    embersEl.textContent = 'BRASAS 0/3';
+    enemies = [ mkEnemy(350,60), mkEnemy(360,236), mkEnemy(150,268) ];
+    embers = []; particles = []; attackHitbox=null;
+    updateHearts();
+  }
+  function triggerWin(){
+    gameState='win';
+    overlay.querySelector('.big').textContent = 'A Floresta Está Salva!';
+    overlay.querySelector('.small').textContent = 'você recuperou as três brasas · toque para jogar de novo';
+    overlay.style.display='flex';
+  }
+  function triggerDefeat(){
+    gameState='defeat';
+    shake=14; flash=1;
+    overlay.querySelector('.big').textContent = 'Você foi derrotado...';
+    overlay.querySelector('.small').textContent = 'as sombras venceram desta vez · toque para tentar de novo';
+    overlay.style.display='flex';
+  }
+
+  function spawnBurst(x,y,color,n=8){
+    for (let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2, sp = 0.8+Math.random()*1.8;
+      particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:22,color});
+    }
+  }
+
+  // ---------- update ----------
+  function resolveObstacles(circle){
+    [...trees, ...rocks].forEach(o=>{
+      const d = dist(circle.x,circle.y,o.x,o.y);
+      const minD = circle.r+o.r;
+      if (d < minD && d>0.001){
+        const push = (minD-d);
+        circle.x += (circle.x-o.x)/d*push;
+        circle.y += (circle.y-o.y)/d*push;
+      }
+    });
+  }
+
+  function update(){
+    frame++;
+    if (!dialogueActive){
+      const kv = keyVector();
+      let ix = joyActive ? joyVec.x : kv.dx;
+      let iy = joyActive ? joyVec.y : kv.dy;
+      const mag = Math.hypot(ix,iy);
+      if (mag>0.05){
+        const nx = ix/Math.max(mag,1), ny = iy/Math.max(mag,1);
+        const scale = joyActive ? clamp(mag,0,1) : 1;
+        player.vx = nx*player.speed*scale;
+        player.vy = ny*player.speed*scale;
+        player.facing = Math.abs(ix)>Math.abs(iy) ? (ix>0?'right':'left') : (iy>0?'down':'up');
+      } else {
+        player.vx = 0; player.vy = 0;
+      }
+
+      player.x += player.vx + player.kx;
+      player.y += player.vy + player.ky;
+      player.kx *= 0.85; player.ky *= 0.85;
+      player.x = clamp(player.x, margin+player.r, W-margin-player.r);
+      player.y = clamp(player.y, margin+player.r, H-margin-player.r);
+      resolveObstacles(player);
+
+      if (player.attackCd>0) player.attackCd--;
+      if (player.invuln>0) player.invuln--;
+
+      // enemies
+      enemies.forEach(en=>{
+        if (!en.alive) return;
+        en.bob += 0.08;
+        const dToPlayer = dist(en.x,en.y,player.x,player.y);
+        if (dToPlayer < 85){
+          const dx=(player.x-en.x)/Math.max(dToPlayer,0.01), dy=(player.y-en.y)/Math.max(dToPlayer,0.01);
+          en.x += dx*1.05; en.y += dy*1.05;
+        } else {
+          en.wanderT--;
+          if (en.wanderT<=0){ en.dir = Math.random()*Math.PI*2; en.wanderT = 60+Math.random()*60; }
+          en.x += Math.cos(en.dir)*0.35; en.y += Math.sin(en.dir)*0.35;
+        }
+        en.x += en.kx; en.y += en.ky; en.kx*=0.85; en.ky*=0.85;
+        en.x = clamp(en.x, margin+en.r, W-margin-en.r);
+        en.y = clamp(en.y, margin+en.r, H-margin-en.r);
+        resolveObstacles(en);
+        if (en.invuln>0) en.invuln--;
+
+        if (dToPlayer < en.r+player.r && player.invuln<=0){
+          player.hp--; updateHearts();
+          player.invuln = 65; shake=8; flash=1;
+          const kdx=(player.x-en.x)/Math.max(dToPlayer,0.01), kdy=(player.y-en.y)/Math.max(dToPlayer,0.01);
+          player.kx = kdx*4.2; player.ky = kdy*4.2;
+          spawnBurst(player.x,player.y,'255,107,129',7);
+          if (player.hp<=0) triggerDefeat();
+        }
+      });
+
+      // attack hitbox
+      if (attackHitbox){
+        attackHitbox.life--;
+        enemies.forEach(en=>{
+          if (!en.alive || attackHitbox.hitSet.has(en)) return;
+          if (dist(attackHitbox.x,attackHitbox.y,en.x,en.y) < attackHitbox.r+en.r){
+            attackHitbox.hitSet.add(en);
+            en.hp--;
+            const kdx=(en.x-player.x)/Math.max(dist(en.x,en.y,player.x,player.y),0.01);
+            const kdy=(en.y-player.y)/Math.max(dist(en.x,en.y,player.x,player.y),0.01);
+            en.kx = kdx*5; en.ky = kdy*5;
+            spawnBurst(en.x,en.y,'190,120,255',6);
+            if (en.hp<=0){
+              en.alive=false;
+              embers.push({x:en.x,y:en.y,r:7,pulse:Math.random()*Math.PI*2});
+              spawnBurst(en.x,en.y,'255,180,84',12);
+            }
+          }
+        });
+        if (attackHitbox.life<=0) attackHitbox=null;
+      }
+      enemies = enemies.filter(en=>en.alive);
+
+      // embers pickup
+      embers.forEach(em=>{
+        em.pulse += 0.12;
+        if (!em.collected && dist(player.x,player.y,em.x,em.y) < player.r+em.r){
+          em.collected = true;
+          embersCollected++;
+          embersEl.textContent = 'BRASAS ' + embersCollected + '/3';
+          spawnBurst(em.x,em.y,'255,215,106',10);
+        }
+      });
+      embers = embers.filter(em=>!em.collected);
+
+      particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; p.life--; });
+      particles = particles.filter(p=>p.life>0);
+    }
+
+    if (shake>0) shake-=0.6;
+    if (flash>0) flash-=0.05;
+
+    fireflies.forEach(f=>{
+      f.y -= f.spd; f.x += Math.sin(frame*0.02+f.tw)*0.15;
+      if (f.y<margin) f.y = H-margin;
+    });
+  }
+
+  // ---------- render ----------
+  function drawBackground(){
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0a1f16');
+    g.addColorStop(0.6,'#071710');
+    g.addColorStop(1,'#030a08');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+
+    ctx.strokeStyle = 'rgba(74,222,128,0.12)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(margin/2, margin/2, W-margin, H-margin);
+
+    fireflies.forEach(f=>{
+      const a = 0.35+Math.sin(frame*0.05+f.tw)*0.35;
+      ctx.fillStyle = `rgba(255,236,160,${Math.max(0,a)})`;
+      ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,Math.PI*2); ctx.fill();
+    });
+  }
+
+  function drawTree(t){
+    ctx.save();
+    ctx.fillStyle = '#0a160f';
+    ctx.strokeStyle = 'rgba(94,234,212,0.28)';
+    ctx.lineWidth = 1.3;
+    [[0,0,1],[ -t.r*0.4,4,0.72],[t.r*0.4,4,0.72]].forEach(([ox,oy,s])=>{
+      ctx.beginPath();
+      ctx.arc(t.x+ox, t.y+oy, t.r*s, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+    });
+    ctx.fillStyle = '#1a1008';
+    ctx.fillRect(t.x-3, t.y+t.r*0.5, 6, 8);
+    ctx.restore();
+  }
+
+  function drawRock(r){
+    ctx.save();
+    ctx.translate(r.x,r.y);
+    ctx.fillStyle = '#3a3d38';
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    for (let i=0;i<6;i++){
+      const ang=(Math.PI*2/6)*i;
+      const rad = r.r*(0.75+((i%2)*0.3));
+      const px=Math.cos(ang)*rad, py=Math.sin(ang)*rad*0.8;
+      if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawNpc(){
+    const pulse = 3+Math.sin(frame*0.08)*2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(191,247,236,0.9)';
+    ctx.shadowBlur = 16+pulse;
+    ctx.fillStyle = '#bff7ec';
+    ctx.beginPath(); ctx.arc(npc.x,npc.y,npc.r*0.6,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(191,247,236,0.5)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(npc.x,npc.y,npc.r+pulse,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+
+    if (dist(player.x,player.y,npc.x,npc.y) < npc.interactR+player.r && !dialogueActive){
+      const ready = questState==='active' && embersCollected>=3;
+      ctx.fillStyle = ready ? '#ffd76a' : '#eafff2';
+      ctx.font = '700 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(ready?'!':'…', npc.x, npc.y-npc.r-10+Math.sin(frame*0.1)*2);
+    }
+  }
+
+  function drawEmber(em){
+    const p = 3+Math.sin(em.pulse)*1.4;
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,180,84,0.9)';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#ffd76a';
+    ctx.beginPath(); ctx.arc(em.x,em.y,5+p*0.3,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,140,60,0.8)';
+    ctx.beginPath();
+    ctx.moveTo(em.x, em.y-9-p);
+    ctx.quadraticCurveTo(em.x+4,em.y-4,em.x,em.y-1);
+    ctx.quadraticCurveTo(em.x-4,em.y-4,em.x,em.y-9-p);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawEnemy(en){
+    const bobY = Math.sin(en.bob)*3;
+    ctx.save();
+    ctx.translate(en.x, en.y+bobY);
+    ctx.shadowColor = 'rgba(192,38,211,0.7)';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#1a0f22';
+    ctx.beginPath(); ctx.arc(0,0,en.r,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(192,38,211,0.55)';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    const ex = (player.x-en.x), ey=(player.y-en.y-bobY);
+    const ed = Math.max(Math.hypot(ex,ey),0.01);
+    ctx.fillStyle = '#ff5d8f';
+    ctx.beginPath(); ctx.arc(ex/ed*3-2, ey/ed*3-1, 1.6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex/ed*3+2, ey/ed*3-1, 1.6, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    const barW = 22;
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(en.x-barW/2, en.y-en.r-10, barW, 3);
+    ctx.fillStyle = '#c026d3';
+    ctx.fillRect(en.x-barW/2, en.y-en.r-10, barW*(en.hp/en.maxHp), 3);
+  }
+
+  function drawPlayer(){
+    if (player.invuln>0 && Math.floor(player.invuln/5)%2===0) return;
+    const fv = facingVector(player.facing);
+    ctx.save();
+    ctx.translate(player.x,player.y);
+
+    ctx.fillStyle = 'rgba(10,10,20,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(-fv.x*4,-fv.y*4, player.r*0.8, player.r*0.9, 0,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.shadowColor = 'rgba(94,234,212,0.7)';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#0c1a16';
+    ctx.beginPath(); ctx.ellipse(0,2,player.r*0.85,player.r*0.7,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#132a22';
+    ctx.beginPath(); ctx.arc(0,-3,player.r*0.62,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#5eead4';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0,-3,player.r*0.62,0,Math.PI*2); ctx.stroke();
+
+    ctx.fillStyle = '#eafff2';
+    ctx.beginPath(); ctx.arc(fv.x*4, -3+fv.y*4, 1.6, 0, Math.PI*2); ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawAttack(){
+    if (!attackHitbox) return;
+    const a = attackHitbox.life/10;
+    ctx.save();
+    ctx.globalAlpha = a*0.8;
+    ctx.strokeStyle = '#eafff2';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#5eead4';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(attackHitbox.x, attackHitbox.y, attackHitbox.r*0.8, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function render(){
+    ctx.save();
+    if (shake>0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+    ctx.clearRect(-20,-20,W+40,H+40);
+    drawBackground();
+
+    const drawables = [];
+    trees.forEach(t=> drawables.push({y:t.y, draw:()=>drawTree(t)}));
+    rocks.forEach(r=> drawables.push({y:r.y, draw:()=>drawRock(r)}));
+    drawables.push({y:npc.y, draw:drawNpc});
+    embers.forEach(em=> drawables.push({y:em.y, draw:()=>drawEmber(em)}));
+    enemies.forEach(en=> drawables.push({y:en.y, draw:()=>drawEnemy(en)}));
+    drawables.push({y:player.y, draw:drawPlayer});
+    drawables.sort((a,b)=>a.y-b.y);
+    drawables.forEach(d=>d.draw());
+
+    drawAttack();
+
+    particles.forEach(p=>{
+      ctx.fillStyle = `rgba(${p.color},${Math.max(0,p.life/22)})`;
+      ctx.beginPath(); ctx.arc(p.x,p.y,2,0,Math.PI*2); ctx.fill();
+    });
+
+    if (flash>0){
+      ctx.fillStyle = `rgba(255,90,90,${flash*0.3})`;
+      ctx.fillRect(0,0,W,H);
+    }
+    ctx.restore();
+  }
+
+  function loop(){
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  updateHearts();
+  loop();
+})();
+</script>
+</body>
+</html>
