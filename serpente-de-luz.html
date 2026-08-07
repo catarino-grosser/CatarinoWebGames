@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Serpente de Luz</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; user-select:none; }
+  html, body {
+    height:100%;
+    background: #05070a;
+    overflow:hidden;
+    touch-action: none;
+  }
+  body {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #wrap {
+    width:100%;
+    max-width:400px;
+    padding:16px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+  h1 {
+    color:#e3ffb8;
+    font-size:14px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    font-weight:600;
+    opacity:0.85;
+  }
+  #stage {
+    position:relative;
+    width:100%;
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow: 0 0 0 1px rgba(163,230,53,0.2), 0 20px 60px -20px rgba(0,0,0,0.85);
+  }
+  canvas {
+    display:block;
+    width:100%;
+    height:auto;
+    background:#05070a;
+  }
+  #hud {
+    position:absolute;
+    top:10px;
+    left:0; right:0;
+    display:flex;
+    justify-content:space-between;
+    padding:0 14px;
+    font-family:'Courier New', monospace;
+    font-weight:700;
+    font-size:14px;
+    color:#eaffcf;
+    text-shadow:0 0 8px rgba(163,230,53,0.55);
+    pointer-events:none;
+  }
+  #overlay {
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:rgba(5,7,10,0.5);
+    color:#f2ffe0;
+    text-align:center;
+    padding:24px;
+  }
+  #overlay .big { font-size:18px; font-weight:700; letter-spacing:0.03em; }
+  #overlay .small { font-size:12px; opacity:0.75; font-family:'Courier New', monospace; max-width:270px; }
+  #hint { color:#454e3a; font-size:12px; letter-spacing:0.04em; text-align:center; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Serpente de Luz</h1>
+  <div id="stage">
+    <canvas id="game" width="380" height="460"></canvas>
+    <div id="hud">
+      <span id="score">000</span>
+      <span id="best">MELHOR 000</span>
+    </div>
+    <div id="overlay">
+      <div class="big">Serpente de Luz</div>
+      <div class="small">arraste para guiar a serpente · colete os orbes · evite a parede e o próprio rastro</div>
+    </div>
+  </div>
+  <div id="hint">arraste na tela para guiar · setas/WASD no computador</div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const margin = 12;
+
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const overlay = document.getElementById('overlay');
+
+  let best = 0;
+  let gameState = 'start'; // start | playing | over
+  let frame = 0;
+  let score = 0;
+  let shake = 0, flash = 0;
+
+  const TURN_RATE = 0.058;
+  const HEAD_R = 7;
+  const SELF_SKIP = 22;
+  const SELF_R = 6;
+
+  let head, path, targetLen, desiredAngle, pointerActive, target;
+  let orb = null;
+  let particles = [];
+  const stars = [];
+  for (let i=0;i<50;i++){
+    stars.push({x:Math.random(), y:Math.random(), r:Math.random()*1.2+0.3, tw:Math.random()*Math.PI*2});
+  }
+
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+  function pad(n){ return String(n).padStart(3,'0'); }
+  function normAngle(a){ while(a>Math.PI)a-=Math.PI*2; while(a<-Math.PI)a+=Math.PI*2; return a; }
+
+  function resetGame(){
+    head = { x:W/2, y:H/2, angle:0 };
+    path = [{x:head.x,y:head.y}];
+    targetLen = 55;
+    desiredAngle = 0;
+    pointerActive = false;
+    target = {x:W/2+100,y:H/2};
+    score = 0; frame = 0; particles = [];
+    scoreEl.textContent = '000';
+    spawnOrb();
+  }
+
+  function startGame(){ resetGame(); gameState='playing'; overlay.style.display='none'; }
+  function endGame(){
+    gameState='over'; shake=13; flash=0.8;
+    if (score>best){ best=score; bestEl.textContent='MELHOR '+pad(best); }
+    overlay.querySelector('.big').textContent = 'A serpente se perdeu na escuridão!';
+    overlay.querySelector('.small').textContent = 'pontos: '+score+' · toque para tentar de novo';
+    overlay.style.display='flex';
+  }
+
+  overlay.addEventListener('touchstart', e=>{ e.preventDefault(); tapStart(); }, {passive:false});
+  overlay.addEventListener('mousedown', tapStart);
+  function tapStart(){ if (gameState==='start'||gameState==='over') startGame(); }
+
+  function canvasPos(clientX,clientY){
+    const rect = canvas.getBoundingClientRect();
+    return { x:(clientX-rect.left)/rect.width*W, y:(clientY-rect.top)/rect.height*H };
+  }
+  function setTarget(clientX,clientY){
+    target = canvasPos(clientX,clientY);
+    pointerActive = true;
+  }
+  canvas.addEventListener('touchstart', e=>{ e.preventDefault(); const t=e.touches[0]; setTarget(t.clientX,t.clientY); }, {passive:false});
+  canvas.addEventListener('touchmove', e=>{ e.preventDefault(); const t=e.touches[0]; setTarget(t.clientX,t.clientY); }, {passive:false});
+  canvas.addEventListener('mousemove', e=> setTarget(e.clientX,e.clientY));
+  canvas.addEventListener('mousedown', e=> setTarget(e.clientX,e.clientY));
+
+  const keys = new Set();
+  document.addEventListener('keydown', e=>{
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code)||['a','d','w','s'].includes(e.key.toLowerCase())) e.preventDefault();
+    keys.add(e.code);
+  });
+  document.addEventListener('keyup', e=> keys.delete(e.code));
+
+  function spawnOrb(){
+    let x,y,tries=0;
+    do {
+      x = margin+30+Math.random()*(W-2*margin-60);
+      y = margin+30+Math.random()*(H-2*margin-60);
+      tries++;
+    } while (Math.hypot(x-head.x,y-head.y)<70 && tries<20);
+    orb = {x,y,pulse:Math.random()*Math.PI*2};
+  }
+
+  function spawnBurst(x,y,color,n){
+    for (let i=0;i<n;i++){
+      const a=Math.random()*Math.PI*2, sp=0.8+Math.random()*2.2;
+      particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:22,color});
+    }
+  }
+
+  function update(){
+    frame++;
+    const turningLeft = keys.has('ArrowLeft')||keys.has('KeyA');
+    const turningRight = keys.has('ArrowRight')||keys.has('KeyD');
+    if (turningLeft) desiredAngle -= 0.05;
+    else if (turningRight) desiredAngle += 0.05;
+    else if (pointerActive){
+      desiredAngle = Math.atan2(target.y-head.y, target.x-head.x);
+    }
+    let diff = normAngle(desiredAngle-head.angle);
+    diff = clamp(diff, -TURN_RATE, TURN_RATE);
+    head.angle += diff;
+
+    const speed = Math.min(3.2, 2.1 + targetLen*0.0035);
+    head.x += Math.cos(head.angle)*speed;
+    head.y += Math.sin(head.angle)*speed;
+
+    path.unshift({x:head.x,y:head.y});
+    if (path.length>targetLen) path.length = targetLen;
+
+    if (head.x<margin||head.x>W-margin||head.y<margin||head.y>H-margin){
+      endGame(); return;
+    }
+    for (let i=SELF_SKIP; i<path.length; i++){
+      const p = path[i];
+      if (Math.hypot(head.x-p.x, head.y-p.y) < SELF_R){
+        endGame(); return;
+      }
+    }
+
+    if (orb){
+      orb.pulse += 0.1;
+      if (Math.hypot(head.x-orb.x, head.y-orb.y) < HEAD_R+8){
+        score++;
+        scoreEl.textContent = pad(score);
+        targetLen += 34;
+        spawnBurst(orb.x,orb.y,'244,114,182',12);
+        spawnOrb();
+      }
+    }
+
+    particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.04; p.life--; });
+    particles = particles.filter(p=>p.life>0);
+
+    if (shake>0) shake-=0.6;
+    if (flash>0) flash-=0.05;
+  }
+
+  function drawBackground(){
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0a0e12');
+    g.addColorStop(0.6,'#070a0d');
+    g.addColorStop(1,'#05070a');
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+    stars.forEach(s=>{
+      const a = 0.25+Math.sin(frame*0.02+s.tw)*0.25;
+      ctx.fillStyle = `rgba(210,230,255,${Math.max(0,a)})`;
+      ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.strokeStyle = 'rgba(163,230,53,0.18)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(margin,margin,W-margin*2,H-margin*2);
+  }
+
+  function drawSnake(){
+    if (path.length<2) return;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(163,230,53,0.75)';
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = 'rgba(163,230,53,0.85)';
+    ctx.lineWidth = 6.5;
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x,path[i].y);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(230,255,190,0.9)';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i=1;i<Math.min(path.length,40);i++) ctx.lineTo(path[i].x,path[i].y);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(230,255,190,0.9)';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = '#f4ffe0';
+    ctx.beginPath(); ctx.arc(head.x,head.y,HEAD_R,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawOrb(){
+    if (!orb) return;
+    const p = 3+Math.sin(orb.pulse)*1.6;
+    ctx.save();
+    ctx.shadowColor = 'rgba(244,114,182,0.9)';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#f472b6';
+    ctx.beginPath(); ctx.arc(orb.x,orb.y,6+p*0.3,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(244,114,182,0.5)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(orb.x,orb.y,11+p*0.3,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function render(){
+    ctx.save();
+    if (shake>0) ctx.translate((Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
+    ctx.clearRect(-20,-20,W+40,H+40);
+    drawBackground();
+    drawOrb();
+    drawSnake();
+
+    particles.forEach(p=>{
+      ctx.fillStyle = `rgba(${p.color},${Math.max(0,p.life/22)})`;
+      ctx.beginPath(); ctx.arc(p.x,p.y,2.2,0,Math.PI*2); ctx.fill();
+    });
+
+    if (flash>0){
+      ctx.fillStyle = `rgba(255,90,90,${flash*0.3})`;
+      ctx.fillRect(0,0,W,H);
+    }
+    ctx.restore();
+  }
+
+  function loop(){
+    if (gameState==='playing') update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  resetGame();
+  render();
+  loop();
+})();
+</script>
+</body>
+</html>
