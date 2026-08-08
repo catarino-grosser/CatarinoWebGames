@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Catarino Web Games</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    min-height:100%;
+    background:#050308;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color:#e8f2ff;
+    display:flex;
+    justify-content:center;
+    position:relative;
+    overflow-x:hidden;
+  }
+  #bg {
+    position:fixed;
+    inset:0;
+    z-index:0;
+  }
+  #wrap {
+    position:relative;
+    z-index:1;
+    width:100%;
+    max-width:420px;
+    padding:34px 18px 40px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  header { text-align:center; margin-bottom:26px; }
+  .marquee {
+    font-size:26px;
+    font-weight:800;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:#fff6e6;
+    animation: flicker 4.2s infinite;
+  }
+  @keyframes flicker {
+    0%, 3%, 6%, 100% { text-shadow: 0 0 8px rgba(255,196,120,0.85), 0 0 22px rgba(255,196,120,0.5), 0 0 2px rgba(120,220,255,0.4); }
+    4% { text-shadow: 0 0 3px rgba(255,196,120,0.3); }
+    7% { text-shadow: 0 0 8px rgba(120,220,255,0.85), 0 0 22px rgba(120,220,255,0.5); }
+    45% { text-shadow: 0 0 8px rgba(255,196,120,0.85), 0 0 22px rgba(255,196,120,0.5); }
+  }
+  .subtitle {
+    margin-top:8px;
+    font-size:13px;
+    color:#8a93a8;
+    letter-spacing:0.03em;
+  }
+
+  .grid {
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  .card {
+    --accent:#ffb454;
+    display:block;
+    text-decoration:none;
+    color:inherit;
+    background:rgba(255,255,255,0.035);
+    border:1px solid rgba(255,255,255,0.09);
+    border-radius:18px;
+    overflow:hidden;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+  .card:active { transform: scale(0.98); }
+  @media (hover:hover) {
+    .card:hover {
+      border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+      box-shadow: 0 10px 30px -14px color-mix(in srgb, var(--accent) 60%, transparent);
+      transform: translateY(-2px);
+    }
+  }
+
+  .preview { position:relative; height:112px; overflow:hidden; background:#0b0617; }
+
+  .card-body { padding:14px 16px 16px; }
+  .card-body h3 { font-size:16px; font-weight:700; margin-bottom:4px; }
+  .card-body p { font-size:12.5px; color:#a4adc0; line-height:1.4; margin-bottom:12px; }
+
+  .play-btn {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:7px 14px;
+    border-radius:999px;
+    background:var(--accent);
+    color:#0b0617;
+    font-weight:700;
+    font-size:12.5px;
+    letter-spacing:0.02em;
+  }
+  .play-btn svg { width:11px; height:11px; }
+
+  /* preview: dusk runner */
+  .preview-dusk { background:linear-gradient(180deg,#0b0617 0%,#3d1a4a 65%,#5c2350 100%); }
+  .preview-dusk .moon {
+    position:absolute; top:16px; right:22px; width:20px; height:20px; border-radius:50%;
+    background:#ffe4b0; box-shadow:0 0 22px 7px rgba(255,196,120,0.45);
+  }
+  .preview-dusk .dune {
+    position:absolute; bottom:-6px; left:-10%; width:120%; height:34px;
+    background:#1b0e2e; border-radius:50% 50% 0 0 / 100% 100% 0 0;
+  }
+  .preview-dusk .runner {
+    position:absolute; bottom:20px; left:30px; width:9px; height:15px; border-radius:3px;
+    background:#150a24; box-shadow:0 0 6px rgba(255,159,91,0.6);
+  }
+  .preview-dusk .rock {
+    position:absolute; bottom:20px; right:46px; width:10px; height:18px;
+    background:#1a0f1f; clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  }
+
+  /* preview: night highway */
+  .preview-highway { background:linear-gradient(180deg,#050308 0%,#170a26 60%); }
+  .preview-highway .skyline {
+    position:absolute; top:14px; left:0; right:0; height:18px;
+    background:repeating-linear-gradient(90deg,#1c1030 0 9px, transparent 9px 15px);
+    opacity:0.85;
+  }
+  .preview-highway .road {
+    position:absolute; bottom:0; left:50%; width:104px; height:76px; transform:translateX(-50%);
+    background:#17131f; clip-path:polygon(43% 0%, 57% 0%, 92% 100%, 8% 100%);
+  }
+  .preview-highway .dash {
+    position:absolute; bottom:0; left:50%; width:44px; height:76px; transform:translateX(-50%);
+    background:repeating-linear-gradient(180deg, rgba(234,252,255,0.9) 0 6px, transparent 6px 13px);
+    clip-path:polygon(48% 0%, 52% 0%, 58% 100%, 42% 100%);
+  }
+  .preview-highway .car {
+    position:absolute; bottom:12px; left:50%; width:13px; height:19px; border-radius:3px;
+    background:#0c0c14; border:2px solid #4dd8ff; box-shadow:0 0 9px rgba(77,216,255,0.65);
+    transform:translateX(-50%);
+  }
+  .preview-highway .rival {
+    position:absolute; top:26px; left:calc(50% + 20px); width:8px; height:12px; border-radius:2px;
+    background:#0c0c14; border:1.5px solid #ff4da6; box-shadow:0 0 6px rgba(255,77,166,0.6);
+  }
+
+  /* preview: star collector */
+  .preview-stars {
+    background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.35), transparent 55%),
+                radial-gradient(circle at 75% 60%, rgba(45,212,191,0.3), transparent 55%),
+                linear-gradient(180deg,#070417 0%,#160b30 100%);
+  }
+  .preview-stars .star {
+    position:absolute; width:9px; height:9px;
+    background:#ffd76a; clip-path: polygon(50% 0%, 61% 35%, 100% 35%, 69% 57%, 79% 91%, 50% 70%, 21% 91%, 31% 57%, 0% 35%, 39% 35%);
+    filter: drop-shadow(0 0 4px rgba(255,215,106,0.8));
+  }
+  .preview-stars .star-a { top:20px; left:34px; }
+  .preview-stars .star-b {
+    top:44px; right:36px; width:7px; height:7px;
+    background:#6ee7f5; filter: drop-shadow(0 0 4px rgba(110,231,245,0.8));
+  }
+  .preview-stars .rock-mini {
+    position:absolute; top:16px; right:70px; width:10px; height:10px; border-radius:35%;
+    background:#3d3444;
+  }
+  .preview-stars .ship {
+    position:absolute; bottom:16px; left:50%; width:0; height:0; transform:translateX(-50%);
+    border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:16px solid #0c0c18;
+    filter: drop-shadow(0 0 6px rgba(45,212,191,0.7));
+  }
+  .preview-stars .ship::after {
+    content:''; position:absolute; left:-3px; top:16px; width:6px; height:6px; border-radius:50%;
+    border:1.5px solid #2dd4bf;
+  }
+
+  /* preview: ocean swimmer */
+  .preview-ocean {
+    background: linear-gradient(180deg,#0a4a63 0%,#053349 55%,#031522 100%);
+  }
+  .preview-ocean .coral {
+    position:absolute; width:16px; background:#ff8a65; opacity:0.9;
+    clip-path: polygon(0% 0%, 100% 0%, 80% 50%, 100% 100%, 0% 100%, 20% 50%);
+  }
+  .preview-ocean .coral-top { top:0; left:26px; height:34px; clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 80% 70%, 60% 100%, 40% 65%, 20% 100%, 0% 70%); }
+  .preview-ocean .coral-bottom { bottom:0; right:30px; height:38px; clip-path: polygon(20% 0%, 40% 35%, 60% 0%, 80% 30%, 100% 0%, 100% 100%, 0% 100%, 0% 0%); }
+  .preview-ocean .pearl {
+    position:absolute; top:46px; left:56px; width:7px; height:7px; border-radius:50%;
+    background:#fff6d5; box-shadow:0 0 8px rgba(255,246,213,0.9);
+  }
+  .preview-ocean .fish {
+    position:absolute; top:64px; left:100px; width:16px; height:11px; border-radius:50%;
+    background:#bfeeff; box-shadow:0 0 6px rgba(191,238,255,0.6);
+  }
+  .preview-ocean .fish::after {
+    content:''; position:absolute; right:-6px; top:1px; width:0; height:0;
+    border-top:4.5px solid transparent; border-bottom:4.5px solid transparent;
+    border-right:6px solid rgba(255,143,163,0.9);
+  }
+
+  /* preview: infinite tower */
+  .preview-tower { background: linear-gradient(180deg,#0a0620 0%,#150a2b 100%); }
+  .preview-tower .moon {
+    position:absolute; top:14px; right:24px; width:14px; height:14px; border-radius:50%;
+    background:#e8e6ff; box-shadow:0 0 14px 4px rgba(232,230,255,0.4);
+  }
+  .preview-tower .block {
+    position:absolute; left:50%; transform:translateX(-50%); height:13px; border-radius:2px;
+    background:#0c0c16;
+  }
+  .preview-tower .b1 { bottom:0;  width:72px; border:1.5px solid #ffb454; box-shadow:0 0 6px rgba(255,180,84,0.5); }
+  .preview-tower .b2 { bottom:13px; width:58px; border:1.5px solid #ff4da6; box-shadow:0 0 6px rgba(255,77,166,0.5); }
+  .preview-tower .b3 { bottom:26px; width:46px; border:1.5px solid #6ee7f5; box-shadow:0 0 6px rgba(110,231,245,0.5); }
+  .preview-tower .b4 { bottom:39px; width:32px; border:1.5px solid #b18aff; box-shadow:0 0 6px rgba(177,138,255,0.5); }
+
+  /* preview: forest rpg */
+  .preview-forest {
+    background: linear-gradient(180deg,#0a1f16 0%,#071710 55%,#030a08 100%);
+  }
+  .preview-forest .tree {
+    position:absolute; width:20px; height:20px; border-radius:50%;
+    background:#0a160f; border:1.3px solid rgba(94,234,212,0.3);
+  }
+  .preview-forest .tree-a { top:14px; left:22px; }
+  .preview-forest .tree-b { top:20px; right:26px; width:16px; height:16px; }
+  .preview-forest .npc-glow {
+    position:absolute; top:44px; left:40px; width:9px; height:9px; border-radius:50%;
+    background:#bff7ec; box-shadow:0 0 10px 3px rgba(191,247,236,0.6);
+  }
+  .preview-forest .ember-dot {
+    position:absolute; bottom:20px; right:40px; width:8px; height:8px; border-radius:50%;
+    background:#ffd76a; box-shadow:0 0 8px rgba(255,215,106,0.8);
+  }
+  .preview-forest .hero-dot {
+    position:absolute; bottom:16px; left:70px; width:9px; height:9px; border-radius:50%;
+    background:#0c1a16; border:1.4px solid #5eead4; box-shadow:0 0 6px rgba(94,234,212,0.6);
+  }
+
+  /* preview: shadow maze */
+  .preview-maze { background:#0c1116; position:relative; }
+  .preview-maze .wall {
+    position:absolute; background:#171d24; border:1px solid rgba(94,150,180,0.1);
+  }
+  .preview-maze .w1 { top:0; left:30%; width:14px; height:60px; }
+  .preview-maze .w2 { bottom:0; left:55%; width:14px; height:55px; }
+  .preview-maze .w3 { top:20px; right:20%; width:40px; height:14px; }
+  .preview-maze .cone {
+    position:absolute; top:30px; left:50px;
+    width:0; height:0;
+    border-top:16px solid transparent;
+    border-bottom:16px solid transparent;
+    border-left:46px solid rgba(255,180,84,0.22);
+  }
+  .preview-maze .hero-dot2 {
+    position:absolute; bottom:18px; left:24px; width:9px; height:9px; border-radius:50%;
+    background:#0e1a17; border:1.4px solid #5eead4; box-shadow:0 0 6px rgba(94,234,212,0.6);
+  }
+
+  /* preview: spell duel */
+  .preview-duel {
+    background: linear-gradient(180deg,#150a28 0%,#0e0620 55%,#08050f 100%);
+  }
+  .preview-duel .wiz {
+    position:absolute; width:0; height:0;
+    border-left:9px solid transparent; border-right:9px solid transparent;
+  }
+  .preview-duel .wiz-a { top:16px; right:34px; border-bottom:22px solid #a21caf; filter:drop-shadow(0 0 6px rgba(162,28,172,0.6)); }
+  .preview-duel .wiz-b { bottom:14px; left:34px; border-bottom:22px solid #5eead4; filter:drop-shadow(0 0 6px rgba(94,234,212,0.6)); transform:rotate(180deg); }
+  .preview-duel .rune {
+    position:absolute; width:10px; height:10px; border-radius:50%;
+  }
+  .preview-duel .rune-1 { top:48px; left:44px; background:#fb923c; box-shadow:0 0 6px rgba(251,146,60,0.8); }
+  .preview-duel .rune-2 { top:58px; left:66px; background:#38bdf8; box-shadow:0 0 6px rgba(56,189,248,0.8); }
+  .preview-duel .rune-3 { top:48px; left:88px; background:#c084fc; box-shadow:0 0 6px rgba(192,132,252,0.8); }
+
+  /* preview: crystal defense */
+  .preview-crystal {
+    background: radial-gradient(circle at 50% 50%, #1a1428 0%, #100c1c 55%, #07060d 100%);
+  }
+  .preview-crystal .ring {
+    position:absolute; top:50%; left:50%; width:96px; height:96px; margin:-48px 0 0 -48px;
+    border-radius:50%; border:1px solid rgba(251,191,36,0.15);
+  }
+  .preview-crystal .gem {
+    position:absolute; top:50%; left:50%; width:16px; height:16px; margin:-8px 0 0 -8px;
+    background:#fbbf24; clip-path:polygon(50% 0%, 100% 38%, 80% 100%, 20% 100%, 0% 38%);
+    box-shadow:0 0 12px rgba(251,191,36,0.8);
+  }
+  .preview-crystal .shadow {
+    position:absolute; width:10px; height:10px; border-radius:50%;
+    background:#1c0f28; border:1.4px solid rgba(167,58,200,0.7);
+    box-shadow:0 0 6px rgba(167,58,200,0.6);
+  }
+  .preview-crystal .sh-a { top:20px; left:30px; }
+  .preview-crystal .sh-b { bottom:22px; right:26px; }
+
+  /* preview: comet hunter */
+  .preview-comet {
+    background: linear-gradient(180deg,#0c0a1a 0%,#08060f 60%,#05050c 100%);
+  }
+  .preview-comet .target {
+    position:absolute; border-radius:50%;
+  }
+  .preview-comet .ta { top:22px; left:36px; width:16px; height:16px; background:#0f2233; border:1.5px solid #7dd3fc; box-shadow:0 0 8px rgba(125,211,252,0.7); }
+  .preview-comet .tb { top:36px; right:30px; width:11px; height:11px; background:#3a2a10; border:1.5px solid #ffd76a; box-shadow:0 0 8px rgba(255,215,106,0.7); }
+  .preview-comet .trail {
+    position:absolute; bottom:26px; left:24px; width:60px; height:2px;
+    background:linear-gradient(90deg, rgba(255,150,80,0), rgba(255,150,80,0.7));
+    transform:rotate(-28deg); transform-origin:left center;
+  }
+  .preview-comet .head {
+    position:absolute; bottom:20px; left:80px; width:8px; height:8px; border-radius:50%;
+    background:#fff3e0; box-shadow:0 0 10px rgba(255,200,140,0.9);
+  }
+  .preview-comet .rig {
+    position:absolute; bottom:8px; left:50%; width:16px; height:14px; margin-left:-8px;
+    border-left:2px solid rgba(251,146,60,0.5); border-right:2px solid rgba(251,146,60,0.5);
+  }
+
+  /* preview: light snake */
+  .preview-snake { background: linear-gradient(180deg,#0a0e12 0%,#070a0d 60%,#05070a 100%); }
+  .preview-snake .s-trail {
+    position:absolute; top:30px; left:26px; width:70px; height:44px;
+    border:3px solid rgba(163,230,53,0.85);
+    border-right-color:transparent; border-bottom-color:transparent;
+    border-radius:50%;
+    filter: drop-shadow(0 0 5px rgba(163,230,53,0.7));
+    transform:rotate(-40deg);
+  }
+  .preview-snake .s-head {
+    position:absolute; top:26px; left:92px; width:9px; height:9px; border-radius:50%;
+    background:#f4ffe0; box-shadow:0 0 10px rgba(230,255,190,0.9);
+  }
+  .preview-snake .s-orb {
+    position:absolute; bottom:20px; right:30px; width:10px; height:10px; border-radius:50%;
+    background:#f472b6; box-shadow:0 0 8px rgba(244,114,182,0.8);
+  }
+
+  /* preview: celestial climb */
+  .preview-climb { background: linear-gradient(180deg,#0a0e1a 0%,#1a1444 60%,#0a0e1a 100%); }
+  .preview-climb .c-plat {
+    position:absolute; height:8px; border-radius:4px; background:#e0e7ff;
+    box-shadow:0 0 6px rgba(224,231,255,0.7);
+  }
+  .preview-climb .p1 { bottom:22px; left:20px; width:40px; }
+  .preview-climb .p2 { top:60px; right:26px; width:36px; background:#67e8f9; box-shadow:0 0 6px rgba(103,232,249,0.7); }
+  .preview-climb .p3 { top:20px; left:40px; width:32px; background:#fbbf24; box-shadow:0 0 6px rgba(251,191,36,0.7); }
+  .preview-climb .c-hero {
+    position:absolute; bottom:34px; left:32px; width:14px; height:14px; border-radius:50%;
+    background:#12172b; border:1.8px solid #a5b4fc; box-shadow:0 0 7px rgba(165,180,252,0.7);
+  }
+
+  /* coming soon card */
+  .card-soon {
+    border:1.5px dashed rgba(255,255,255,0.16);
+    background:rgba(255,255,255,0.015);
+  }
+  .preview-soon {
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 40%, rgba(255,255,255,0.05), transparent 70%);
+  }
+  .preview-soon .plus {
+    font-size:30px; color:rgba(255,255,255,0.22); font-weight:300;
+  }
+  .card-soon .card-body h3 { color:rgba(255,255,255,0.55); }
+  .card-soon .card-body p { color:rgba(255,255,255,0.32); margin-bottom:0; }
+
+  footer {
+    margin-top:30px;
+    font-size:11.5px;
+    color:#4b5468;
+    letter-spacing:0.03em;
+    text-align:center;
+  }
+
+  /* saldo de fichas */
+  #fichasBar {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    margin-top:14px;
+  }
+  #fichasSaldo {
+    font-family:'Courier New', monospace;
+    font-size:13px;
+    font-weight:700;
+    color:#ffe9b8;
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,196,120,0.3);
+    padding:5px 12px;
+    border-radius:999px;
+  }
+  #btnComprar {
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:700;
+    color:#0b0617;
+    background:#ffb454;
+    border:none;
+    padding:6px 14px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+
+  /* modal de compra */
+  #pixModal {
+    position:fixed;
+    inset:0;
+    z-index:20;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(3,2,8,0.75);
+    padding:20px;
+  }
+  #pixModal.open { display:flex; }
+  #pixCard {
+    width:100%;
+    max-width:340px;
+    background:#0d0a16;
+    border:1px solid rgba(255,196,120,0.25);
+    border-radius:18px;
+    padding:20px;
+    text-align:center;
+    color:#f2ecff;
+  }
+  #pixCard h2 { font-size:16px; margin-bottom:4px; }
+  #pixCard .sub { font-size:12px; color:#9aa1b4; margin-bottom:14px; }
+  #pixCard img { width:180px; height:180px; border-radius:10px; background:#fff; margin:0 auto 14px; display:block; }
+  #pixCode {
+    width:100%;
+    font-size:10.5px;
+    font-family:'Courier New', monospace;
+    color:#c9d0e0;
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:8px;
+    padding:8px;
+    resize:none;
+    margin-bottom:10px;
+  }
+  .pixBtnRow { display:flex; gap:8px; margin-bottom:10px; }
+  .pixBtn {
+    flex:1;
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:700;
+    padding:9px;
+    border-radius:10px;
+    border:none;
+    cursor:pointer;
+  }
+  .pixBtn.primary { background:#ffb454; color:#0b0617; }
+  .pixBtn.secondary { background:rgba(255,255,255,0.08); color:#f2ecff; }
+  #pixStatus { font-size:11.5px; color:#8a93a8; min-height:16px; margin-bottom:8px; }
+  #pixClose {
+    background:none; border:none; color:#6b7280; font-size:12px;
+    text-decoration:underline; cursor:pointer; font-family:inherit;
+  }
+  #pixLoading, #pixError { font-size:13px; color:#c9d0e0; padding:20px 0; }
+  #pixError { color:#f87171; }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div id="wrap">
+  <header>
+    <div class="marquee">Catarino Web Games</div>
+    <p class="subtitle">escolha um jogo para começar</p>
+    <div id="fichasBar">
+      <span id="fichasSaldo">🎟️ ...</span>
+      <button id="btnComprar">Comprar fichas</button>
+    </div>
+  </header>
+
+  <main class="grid" id="grid"></main>
+
+  <div id="pixModal">
+    <div id="pixCard">
+      <div id="pixContent"></div>
+      <button id="pixClose">fechar</button>
+    </div>
+  </div>
+
+  <footer>
+    <p>
+      novos jogos chegando em breve ✦
+    </p> <br />
+  <span>Desenvolvido por <strong>
+    Catarino Web Studio
+  </strong></span>
+  </footer>
+</div>
+
+<script src="fichas.js"></script>
+<script>
+  // ---------------------------------------------------------------
+  // Para adicionar um novo jogo no futuro, basta incluir mais um
+  // objeto neste array (e criar um preview em CSS, se quiser um
+  // visual dedicado — ou reaproveitar "dusk"/"highway"/"soon").
+  // ---------------------------------------------------------------
+  const games = [
+    {
+      title: 'Corredor do Crepúsculo',
+      tagline: 'Pule sobre as pedras e sobreviva ao deserto ao anoitecer.',
+      href: 'dusk-runner.html',
+      accent: '#ffb454',
+      preview: 'dusk'
+    },
+    {
+      title: 'Rodovia Noturna',
+      tagline: 'Desvie dos carros numa pista iluminada de neon.',
+      href: 'rodovia-noturna.html',
+      accent: '#4dd8ff',
+      preview: 'highway'
+    },
+    {
+      title: 'Coletor de Estrelas',
+      tagline: 'Guie a nave, pegue estrelas e desvie dos asteroides.',
+      href: 'coletor-de-estrelas.html',
+      accent: '#2dd4bf',
+      preview: 'stars'
+    },
+    {
+      title: 'Peixe Contra a Correnteza',
+      tagline: 'Nade entre os corais e junte pérolas de luz.',
+      href: 'peixe-correnteza.html',
+      accent: '#7dd3fc',
+      preview: 'ocean'
+    },
+    {
+      title: 'Torre Infinita',
+      tagline: 'Encaixe os blocos no momento certo e suba o mais alto possível.',
+      href: 'torre-infinita.html',
+      accent: '#b18aff',
+      preview: 'tower'
+    },
+    {
+      title: 'Floresta dos Ecos',
+      tagline: 'Explore, converse e enfrente sombras para salvar a floresta.',
+      href: 'floresta-dos-ecos.html',
+      accent: '#4ade80',
+      preview: 'forest'
+    },
+    {
+      title: 'Labirinto das Sombras',
+      tagline: 'Fuja da luz dos guardas, pegue a chave e escape do labirinto.',
+      href: 'labirinto-sombras.html',
+      accent: '#f87171',
+      preview: 'maze'
+    },
+    {
+      title: 'Duelo de Feitiços',
+      tagline: 'Memorize a sequência de runas e conjure antes do tempo acabar.',
+      href: 'duelo-de-feiticos.html',
+      accent: '#e879f9',
+      preview: 'duel'
+    },
+    {
+      title: 'Guardião do Cristal',
+      tagline: 'Toque nas sombras antes que cheguem no cristal central.',
+      href: 'guardiao-do-cristal.html',
+      accent: '#fbbf24',
+      preview: 'crystal'
+    },
+    {
+      title: 'Cometa Caçador',
+      tagline: 'Arraste, mire em arco e acerte os meteoros antes que escapem.',
+      href: 'cometa-cacador.html',
+      accent: '#fb923c',
+      preview: 'comet'
+    },
+    {
+      title: 'Serpente de Luz',
+      tagline: 'Guie o rastro neon, colete orbes e não bata na parede nem em si mesma.',
+      href: 'serpente-de-luz.html',
+      accent: '#a3e635',
+      preview: 'snake'
+    },
+    {
+      title: 'Escalada Celeste',
+      tagline: 'O pulo é automático — arraste para os lados e suba sem parar.',
+      href: 'escalada-celeste.html',
+      accent: '#a5b4fc',
+      preview: 'climb'
+    }
+  ];
+
+  const previews = {
+    dusk: `<div class="preview preview-dusk"><div class="moon"></div><div class="rock"></div><div class="dune"></div><div class="runner"></div></div>`,
+    highway: `<div class="preview preview-highway"><div class="skyline"></div><div class="road"></div><div class="dash"></div><div class="rival"></div><div class="car"></div></div>`,
+    stars: `<div class="preview preview-stars"><div class="nebula"></div><div class="star star-a"></div><div class="star star-b"></div><div class="rock-mini"></div><div class="ship"></div></div>`,
+    ocean: `<div class="preview preview-ocean"><div class="coral coral-top"></div><div class="coral coral-bottom"></div><div class="pearl"></div><div class="fish"></div></div>`,
+    tower: `<div class="preview preview-tower"><div class="moon"></div><div class="block b1"></div><div class="block b2"></div><div class="block b3"></div><div class="block b4"></div></div>`,
+    forest: `<div class="preview preview-forest"><div class="tree tree-a"></div><div class="tree tree-b"></div><div class="npc-glow"></div><div class="ember-dot"></div><div class="hero-dot"></div></div>`,
+    maze: `<div class="preview preview-maze"><div class="wall w1"></div><div class="wall w2"></div><div class="wall w3"></div><div class="cone"></div><div class="hero-dot2"></div></div>`,
+    duel: `<div class="preview preview-duel"><div class="wiz wiz-a"></div><div class="wiz wiz-b"></div><div class="rune rune-1"></div><div class="rune rune-2"></div><div class="rune rune-3"></div></div>`,
+    crystal: `<div class="preview preview-crystal"><div class="ring"></div><div class="gem"></div><div class="shadow sh-a"></div><div class="shadow sh-b"></div></div>`,
+    comet: `<div class="preview preview-comet"><div class="target ta"></div><div class="target tb"></div><div class="trail"></div><div class="head"></div><div class="rig"></div></div>`,
+    snake: `<div class="preview preview-snake"><div class="s-orb"></div><div class="s-trail"></div><div class="s-head"></div></div>`,
+    climb: `<div class="preview preview-climb"><div class="c-plat p1"></div><div class="c-plat p2"></div><div class="c-plat p3"></div><div class="c-hero"></div></div>`
+  };
+
+  const grid = document.getElementById('grid');
+
+  games.forEach(g => {
+    const a = document.createElement('a');
+    a.className = 'card';
+    a.href = g.href;
+    a.style.setProperty('--accent', g.accent);
+    a.innerHTML = `
+      ${previews[g.preview] || ''}
+      <div class="card-body">
+        <h3>${g.title}</h3>
+        <p>${g.tagline}</p>
+        <span class="play-btn">Jogar
+          <svg viewBox="0 0 12 12" fill="none"><path d="M2 1L9 6L2 11" stroke="#0b0617" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </div>`;
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      a.style.opacity = '0.6';
+      try {
+        const r = await Fichas.consumirFicha();
+        if (r.ok) {
+          updateSaldoDisplay(r.balance);
+          window.location.href = g.href;
+        } else {
+          a.style.opacity = '1';
+          abrirModalCompra();
+        }
+      } catch (err) {
+        a.style.opacity = '1';
+        alert('Não foi possível conectar ao servidor de fichas. Tente novamente.');
+      }
+    });
+    grid.appendChild(a);
+  });
+
+  const soon = document.createElement('div');
+  soon.className = 'card card-soon';
+  soon.innerHTML = `
+    <div class="preview preview-soon"><div class="plus">+</div></div>
+    <div class="card-body">
+      <h3>Em breve</h3>
+      <p>Novos jogos chegando nesta sala de fliperama.</p>
+    </div>`;
+  grid.appendChild(soon);
+
+  // starfield background
+  const canvas = document.getElementById('bg');
+  const ctx = canvas.getContext('2d');
+  function resize(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const stars = [];
+  for (let i=0;i<70;i++){
+    stars.push({
+      x: Math.random(), y: Math.random(),
+      r: Math.random()*1.3+0.3,
+      tw: Math.random()*Math.PI*2
+    });
+  }
+  let f = 0;
+  function draw(){
+    f++;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    stars.forEach(s=>{
+      const a = 0.25 + Math.sin(f*0.02 + s.tw)*0.25;
+      ctx.fillStyle = `rgba(200,220,255,${Math.max(0,a)})`;
+      ctx.beginPath();
+      ctx.arc(s.x*canvas.width, s.y*canvas.height, s.r, 0, Math.PI*2);
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+
+  // ---------------------------------------------------------------
+  // Saldo de fichas + modal de compra via PIX
+  // ---------------------------------------------------------------
+  const fichasSaldoEl = document.getElementById('fichasSaldo');
+  const btnComprar = document.getElementById('btnComprar');
+  const pixModal = document.getElementById('pixModal');
+  const pixContent = document.getElementById('pixContent');
+  const pixCloseBtn = document.getElementById('pixClose');
+
+  function updateSaldoDisplay(balance) {
+    fichasSaldoEl.textContent = '🎟️ ' + balance + (balance === 1 ? ' ficha' : ' fichas');
+  }
+
+  async function carregarSaldoInicial() {
+    try {
+      const balance = await Fichas.getSaldo();
+      updateSaldoDisplay(balance);
+    } catch {
+      fichasSaldoEl.textContent = '🎟️ —';
+    }
+  }
+  carregarSaldoInicial();
+
+  let pollTimer = null;
+  function pararPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  function fecharModal() {
+    pararPolling();
+    pixModal.classList.remove('open');
+    pixContent.innerHTML = '';
+  }
+  pixCloseBtn.addEventListener('click', fecharModal);
+  pixModal.addEventListener('click', (e) => { if (e.target === pixModal) fecharModal(); });
+  btnComprar.addEventListener('click', abrirModalCompra);
+
+  async function abrirModalCompra() {
+    pixModal.classList.add('open');
+    pixContent.innerHTML = `<div id="pixLoading">Gerando o PIX...</div>`;
+    try {
+      const { paymentId, qrCode, qrCodeBase64 } = await Fichas.criarPix();
+      pixContent.innerHTML = `
+        <h2>30 fichas por R$ 1,00</h2>
+        <p class="sub">escaneie ou copie o código PIX no app do seu banco</p>
+        <img src="data:image/png;base64,${qrCodeBase64}" alt="QR code PIX" />
+        <textarea id="pixCode" rows="3" readonly>${qrCode}</textarea>
+        <div class="pixBtnRow">
+          <button class="pixBtn secondary" id="pixCopyBtn">Copiar código</button>
+          <button class="pixBtn primary" id="pixCheckBtn">Já paguei</button>
+        </div>
+        <div id="pixStatus">aguardando confirmação do pagamento...</div>
+      `;
+
+      document.getElementById('pixCopyBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(qrCode);
+        document.getElementById('pixStatus').textContent = 'código copiado! cole no app do seu banco.';
+      });
+
+      const statusEl = document.getElementById('pixStatus');
+      async function verificar() {
+        const { credited } = await Fichas.statusPix(paymentId);
+        if (credited) {
+          pararPolling();
+          const balance = await Fichas.getSaldo();
+          updateSaldoDisplay(balance);
+          statusEl.textContent = '✅ pagamento confirmado! fichas creditadas.';
+          setTimeout(fecharModal, 1800);
+        }
+      }
+      document.getElementById('pixCheckBtn').addEventListener('click', verificar);
+      pollTimer = setInterval(verificar, 3000);
+    } catch (err) {
+      pixContent.innerHTML = `<div id="pixError">Não foi possível gerar o PIX agora. Tente novamente em instantes.</div>`;
+    }
+  }
+
+  // se o usuário sair pra pagar no app do banco e voltar pra essa aba, revalida o saldo
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') carregarSaldoInicial();
+  });
+</script>
+</body>
+</html>
